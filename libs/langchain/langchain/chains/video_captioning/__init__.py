@@ -1,1 +1,1 @@
-"""Chain for creating cpation for video."""
+"""Chain for creating caption for video."""
