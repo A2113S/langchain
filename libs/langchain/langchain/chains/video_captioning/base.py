@@ -2,85 +2,81 @@ from typing import List, Optional, Dict, Any
 
 from pydantic import Extra
 
-from langchain.callbacks.base import Callbacks
 from langchain.callbacks.manager import CallbackManagerForChainRun
-from langchain.chains import LLMChain
+from langchain.chains.base import Chain
 from langchain.chains.video_captioning.audio_service import AudioProcessor
+from langchain.chains.video_captioning.combine_service import CombineProcessor
 from langchain.chains.video_captioning.image_service import ImageProcessor
 from langchain.prompts import PromptTemplate
-from langchain.schema import LLMResult
 from langchain.schema.language_model import BaseLanguageModel
 
 
-class VideoCaptioningChain(LLMChain):
-    def __init__(self, llm: BaseLanguageModel, prompt: PromptTemplate):
-        super().__init__(llm=llm, prompt=prompt, output_parser="srt")
-        # Instantiate the processors
-        self.audio_processor = AudioProcessor()
-        self.image_processor = ImageProcessor()
+class VideoCaptioningChain(Chain):
+    llm: BaseLanguageModel
+    prompt: PromptTemplate
+    audio_processor: Optional[AudioProcessor] = None
+    image_processor: Optional[ImageProcessor] = None
+    combine_processor: Optional[CombineProcessor] = None
+
+    def __init__(
+        self,
+        llm: BaseLanguageModel,
+        prompt: PromptTemplate,
+        verbose: bool = True,
+        audio_processor: Optional[AudioProcessor] = None,
+        image_processor: Optional[ImageProcessor] = None,
+        combine_processor: Optional[CombineProcessor] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            llm=llm,
+            prompt=prompt,
+            verbose=verbose,
+            **kwargs
+        )
+        self.llm = llm
+        self.prompt = prompt
+        self.verbose = verbose
+        self.audio_processor = audio_processor or AudioProcessor()
+        self.image_processor = image_processor or ImageProcessor(llm=llm, verbose=verbose)
+        self.combine_processor = combine_processor or CombineProcessor(llm=llm, verbose=verbose)
 
     class Config:
-        """Configuration for this pydantic object."""
-
         extra = Extra.forbid
         arbitrary_types_allowed = True
 
     @property
     def input_keys(self) -> List[str]:
-        """Input keys.
-        :meta private:
-        """
-        return [self.input_key]
+        return ["video_file_path"]
 
     @property
     def output_keys(self) -> List[str]:
-        """Output keys.
-        :meta private:
-        """
-        return [self.output_key]
+        return ["srt"]
 
     def _call(
-        self,
-        inputs: Dict[str, Any],
-        run_manager: Optional[CallbackManagerForChainRun] = None,
+            self,
+            inputs: Dict[str, Any],
+            run_manager: Optional[CallbackManagerForChainRun] = None,
     ) -> Dict[str, str]:
         if "video_file_path" not in inputs:
-            raise ValueError(
-                "Missing 'video_file_path' in inputs for video captioning."
-            )
-
+            raise ValueError("Missing 'video_file_path' in inputs for video captioning.")
         video_file_path = inputs["video_file_path"]
-
-        # Call the service for audio processing
-        audio_transcription = self.audio_processor.process(video_file_path)
-
-        # Call the service for image processing
-        image_transcriptions = self.image_processor.process(video_file_path)
-
-        # Combine the transcriptions
-        combined_transcription = self.combine_transcriptions(
-            audio_transcription, image_transcriptions
-        )
-
-        # Convert to SRT format
-        srt_content = self.format_transcription_to_srt(combined_transcription)
-
+        audio_models = self.audio_processor.process(video_file_path)
+        video_models = self.image_processor.process(video_file_path)
+        caption_models = self.combine_processor.process(audio_models, video_models)
+        srt_content = self.generate_srt_content(caption_models)
         return {"srt": srt_content}
 
-    def combine_transcriptions(
-        self, audio_transcription: str, image_transcriptions: List[str]
-    ) -> str:
-        """
-        Combine the transcriptions from audio and images, removing duplicates.
-        """
-        # Implementation to combine and remove duplicates
-        # ...
+    def format_srt_entry(self, index: int, caption_model) -> str:
+        start_time, end_time, text = caption_model
+        return f"{index}\n{start_time} --> {end_time}\n{text}\n"
 
-    def format_transcription_to_srt(self, transcription: str) -> str:
-        """
-        Convert transcription text to SRT format.
-        """
-        # Implementation to format into SRT
-        # ...
+    def generate_srt_content(self, caption_models: List[Dict[str, str]]) -> str:
+        return "\n".join(
+            self.format_srt_entry(i + 1, model)
+            for i, model in enumerate(caption_models)
+        )
 
-    # TODO: Additional methods for video processing and SRT formatting may be added here
+    @property
+    def _chain_type(self) -> str:
+        return "video_captioning_chain"

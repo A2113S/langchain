@@ -1,4 +1,6 @@
 import ffmpeg
+import subprocess
+from pathlib import Path
 
 from langchain.chains.video_captioning.models import AudioModel
 from langchain.document_loaders import AssemblyAIAudioTranscriptLoader
@@ -6,57 +8,63 @@ from langchain.document_loaders.assemblyai import TranscriptFormat
 
 
 class AudioProcessor:
-    def process(self, video_file_path: str) -> str:
+    def __init__(
+        self,
+        output_audio_path="output_audio.mp3",
+        api_key="f50c08e20ecd4544b175953636f0b936",
+    ):
+        self.output_audio_path = output_audio_path
+        self.api_key = api_key
+
+    def process(self, video_file_path: str) -> list:
         audio_file_path = self.extract_audio(video_file_path)
-        transcription = self.transcribe_audio(audio_file_path)
-        return transcription
+        return self.transcribe_audio(audio_file_path)
 
-    def extract_audio(self, video_file_path: str) -> str:
-        audio_file_path = "output_audio.mp3"
-        (ffmpeg.input(video_file_path).output(audio_file_path, format="mp3").run())
-        return audio_file_path
+    def extract_audio(self, video_file_path: str) -> Path:
+        output_audio_path = Path(self.output_audio_path)
 
-    def CreateTranscriptModels(self, doc):
-        subtitles = doc.strip().split(
-            "\n\n"
-        )  # Splitting based on double newline, which separates SRT entries
-        models = []
+        # Ensure the directory exists where the output file will be saved
+        output_audio_path.parent.mkdir(parents=True, exist_ok=True)
 
-        for subtitle in subtitles:
-            lines = subtitle.split("\n")
-            if (
-                len(lines) >= 3
-            ):  # Checking if there are enough lines for an index, timestamp, and text
-                times = lines[1].split(" --> ")
-                start_time = times[0].strip()
-                end_time = times[1].strip()
-
-                subtitle_text = " ".join(lines[2:]).strip()
-
-                transcript_model = AudioModel(start_time, end_time, subtitle_text)
-                models.append(transcript_model)
-
-        return models
-
-    def transcribe_audio(self, audio_file_path: str) -> str:
-        loader = AssemblyAIAudioTranscriptLoader(
-            file_path=audio_file_path,
-            api_key="your_api_key",  # Replace with your actual API key
-            transcript_format=TranscriptFormat.SUBTITLES_SRT,
-        )
-
-        # Load the transcript
-        docs = loader.load()
-
-        # Process the transcript to create AudioModel instances
-        all_audio_models = [
-            self.CreateTranscriptModels(doc.page_content) for doc in docs
+        command = [
+            "ffmpeg", "-i", video_file_path, "-vn", "-acodec", "mp3",
+            output_audio_path.as_posix(), "-y"  # The '-y' flag overwrites the output file if it exists
         ]
 
-        # Flatten the list of AudioModel instances
-        audio_models = [model for sublist in all_audio_models for model in sublist]
+        subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        return output_audio_path
 
-        # Combine the text from all AudioModel instances for the final transcription
-        transcription = " ".join([model.text for model in audio_models])
+    def transcribe_audio(self, audio_file_path: Path) -> list:
+        if not self.api_key:
+            raise ValueError("API key for AssemblyAI is not configured")
+        audio_file_path_str = str(audio_file_path)
+        loader = AssemblyAIAudioTranscriptLoader(
+            file_path=audio_file_path_str,
+            api_key=self.api_key,
+            transcript_format=TranscriptFormat.SUBTITLES_SRT,
+        )
+        docs = loader.load()
+        return self.create_transcript_models(docs)
 
-        return transcription
+    def create_transcript_models(self, docs):
+        # Assuming docs is a list of Documents with .page_content as the transcript data
+        models = []
+        for doc in docs:
+            models.extend(self.parse_transcript(doc.page_content))
+        return models
+
+    def parse_transcript(self, srt_content: str):
+        models = []
+        entries = srt_content.strip().split("\n\n")  # Split based on double newline
+
+        for entry in entries:
+            index, timespan, *subtitle_lines = entry.split("\n")
+
+            # If not a valid entry format, skip
+            if len(subtitle_lines) == 0:
+                continue
+
+            start_time, end_time = timespan.split(" --> ")
+            subtitle_text = " ".join(subtitle_lines).strip()
+            models.append(AudioModel(start_time, end_time, subtitle_text))
+        return models
