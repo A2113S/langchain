@@ -22,8 +22,8 @@ class CombineProcessor:
             )
             response = validation(
                 {
-                    "subtitle": audio_model.get_subtitle_text(),
-                    "image_description": video_model.get_image_description(),
+                    "subtitle": audio_model.subtitle_text,
+                    "image_description": video_model.image_description,
                 }
             )
             return response["text"].replace("Result:", "").strip()
@@ -40,14 +40,16 @@ class CombineProcessor:
 
             return f"{hours:02}:{minutes:02}:{seconds:02},{milliseconds:03}"
 
-        def find_overlapping_audio_models(video_model, audio_models):
+        def find_overlapping_audio_models(
+            video_model: VideoModel, audio_models: list[AudioModel]
+        ):
             overlapping_models = []
-            video_start = video_model.get_start_time()
-            video_end = video_model.get_end_time()
+            video_start = video_model.start_time
+            video_end = video_model.end_time
 
             for audio_model in audio_models:
-                audio_start = self.parse_time(str(audio_model.get_start_time()))
-                audio_end = self.parse_time(str(audio_model.get_end_time()))
+                audio_start = self.parse_time(str(audio_model.start_time))
+                audio_end = self.parse_time(str(audio_model.end_time))
                 overlap_start = max(audio_start, video_start)
                 overlap_end = min(audio_end, video_end)
 
@@ -65,20 +67,20 @@ class CombineProcessor:
 
             if overlapping_audio_models:
                 # Create separate captions for each overlapping audio model
-                last_end_time = video_model.get_start_time()  # Initialize last_end_time
+                last_end_time = video_model.start_time  # Initialize last_end_time
 
                 for audio_model in overlapping_audio_models:
                     overlap_start = max(
-                        video_model.get_start_time(),
-                        self.parse_time(audio_model.get_start_time()),
+                        video_model.start_time,
+                        self.parse_time(audio_model.start_time),
                     )
                     overlap_end = min(
-                        video_model.get_end_time(),
-                        self.parse_time(audio_model.get_end_time()),
+                        video_model.end_time,
+                        self.parse_time(audio_model.end_time),
                     )
 
                     # Create a caption for the overlapping period
-                    caption_text = f"[{validate_and_adjust_description(audio_model, video_model)}] {audio_model.get_subtitle_text()}"
+                    caption_text = f"[{validate_and_adjust_description(audio_model, video_model)}] {audio_model.subtitle_text}"
                     caption_model = CaptionModel(
                         milliseconds_to_srt_time(overlap_start),
                         milliseconds_to_srt_time(overlap_end),
@@ -89,10 +91,10 @@ class CombineProcessor:
                     last_end_time = overlap_end  # Update last_end_time
 
                 # If there is a gap after the last overlapping period, create a caption for that gap
-                if last_end_time < video_model.get_end_time():
+                if last_end_time < video_model.end_time:
                     gap_start = last_end_time
-                    gap_end = video_model.get_end_time()
-                    gap_caption_text = f"[{video_model.get_image_description()}]"
+                    gap_end = video_model.end_time
+                    gap_caption_text = f"[{video_model.image_description}]"
                     gap_caption_model = CaptionModel(
                         milliseconds_to_srt_time(gap_start),
                         milliseconds_to_srt_time(gap_end),
@@ -102,10 +104,10 @@ class CombineProcessor:
 
             else:
                 # No overlapping audio, use video model's description for the entire duration
-                caption_text = f"[{video_model.get_image_description()}]"
+                caption_text = f"[{video_model.image_description}]"
                 caption_model = CaptionModel(
-                    self.milliseconds_to_srt_time(video_model.get_start_time()),
-                    self.milliseconds_to_srt_time(video_model.get_end_time()),
+                    milliseconds_to_srt_time(video_model.start_time),
+                    milliseconds_to_srt_time(video_model.end_time),
                     caption_text,
                 )
                 caption_models.append(caption_model)

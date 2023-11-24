@@ -63,15 +63,14 @@ class ImageProcessor:
 
     def optimize_caption(self, video_models) -> list:
         from langchain.chains import LLMChain
+
         optimizing = LLMChain(
             llm=self.llm, prompt=VIDEO_OPTIMIZING_PROMPT, verbose=self.verbose
         )
 
         caption_data = ""
-        num = 0
         for model in video_models:
-            caption_data += f"{num}: {str(model)}\n"
-            num += 1
+            caption_data += f"{str(model)}\n"
 
         result = optimizing({"closed_caption": caption_data})
         optimized_caption = result["text"]

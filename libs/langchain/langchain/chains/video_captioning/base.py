@@ -28,18 +28,17 @@ class VideoCaptioningChain(Chain):
         combine_processor: Optional[CombineProcessor] = None,
         **kwargs,
     ):
-        super().__init__(
-            llm=llm,
-            prompt=prompt,
-            verbose=verbose,
-            **kwargs
-        )
+        super().__init__(llm=llm, prompt=prompt, verbose=verbose, **kwargs)
         self.llm = llm
         self.prompt = prompt
         self.verbose = verbose
         self.audio_processor = audio_processor or AudioProcessor()
-        self.image_processor = image_processor or ImageProcessor(llm=llm, verbose=verbose)
-        self.combine_processor = combine_processor or CombineProcessor(llm=llm, verbose=verbose)
+        self.image_processor = image_processor or ImageProcessor(
+            llm=llm, verbose=verbose
+        )
+        self.combine_processor = combine_processor or CombineProcessor(
+            llm=llm, verbose=verbose
+        )
 
     class Config:
         extra = Extra.forbid
@@ -54,12 +53,14 @@ class VideoCaptioningChain(Chain):
         return ["srt"]
 
     def _call(
-            self,
-            inputs: Dict[str, Any],
-            run_manager: Optional[CallbackManagerForChainRun] = None,
+        self,
+        inputs: Dict[str, Any],
+        run_manager: Optional[CallbackManagerForChainRun] = None,
     ) -> Dict[str, str]:
         if "video_file_path" not in inputs:
-            raise ValueError("Missing 'video_file_path' in inputs for video captioning.")
+            raise ValueError(
+                "Missing 'video_file_path' in inputs for video captioning."
+            )
         video_file_path = inputs["video_file_path"]
         audio_models = self.audio_processor.process(video_file_path)
         video_models = self.image_processor.process(video_file_path)
@@ -67,15 +68,22 @@ class VideoCaptioningChain(Chain):
         srt_content = self.generate_srt_content(caption_models)
         return {"srt": srt_content}
 
-    def format_srt_entry(self, index: int, caption_model) -> str:
-        start_time, end_time, text = caption_model
+    def format_srt_entry(self, index, caption_model):
+        """Formats a single caption model into an SRT entry."""
+        start_time = caption_model.start_time
+        end_time = caption_model.end_time
+        text = caption_model.closed_caption
+
         return f"{index}\n{start_time} --> {end_time}\n{text}\n"
 
     def generate_srt_content(self, caption_models: List[Dict[str, str]]) -> str:
-        return "\n".join(
-            self.format_srt_entry(i + 1, model)
-            for i, model in enumerate(caption_models)
-        )
+        """Generates the full SRT content from a list of caption models."""
+        srt_entries = []
+        for index, model in enumerate(caption_models, start=1):
+            srt_entry = self.format_srt_entry(index, model)
+            srt_entries.append(srt_entry)
+
+        return "\n".join(srt_entries)
 
     @property
     def _chain_type(self) -> str:

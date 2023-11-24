@@ -27,11 +27,19 @@ class AudioProcessor:
         output_audio_path.parent.mkdir(parents=True, exist_ok=True)
 
         command = [
-            "ffmpeg", "-i", video_file_path, "-vn", "-acodec", "mp3",
-            output_audio_path.as_posix(), "-y"  # The '-y' flag overwrites the output file if it exists
+            "ffmpeg",
+            "-i",
+            video_file_path,
+            "-vn",
+            "-acodec",
+            "mp3",
+            output_audio_path.as_posix(),
+            "-y",  # The '-y' flag overwrites the output file if it exists
         ]
 
-        subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
+        )
         return output_audio_path
 
     def transcribe_audio(self, audio_file_path: Path) -> list:
