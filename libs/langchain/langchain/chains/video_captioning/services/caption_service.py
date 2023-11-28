@@ -64,7 +64,7 @@ class CaptionProcessor(Processor):
 
             # Join this model and the previous model if they have the same image description
             if (len(video_models) > 0 and video_models[-1].image_description == video_model.image_description):
-                buffer[-1].end_time(video_model.end_time)
+                buffer[-1].end_time = video_model.end_time
 
             else:
                 buffer.append(video_model)
