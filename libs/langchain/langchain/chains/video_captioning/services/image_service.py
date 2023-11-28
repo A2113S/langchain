@@ -12,77 +12,82 @@ transformers.logging.set_verbosity_error()
 
 
 class ImageProcessor:
-    def __init__(self, threshold: int = 30):
+    def __init__(self, frame_skip = 3, threshold: int = 3000000):
         self.threshold = threshold
+        self.frame_skip = frame_skip
 
     def process(self, video_file_path: str) -> list:
         return self.__extract_frames(video_file_path)
     
+
     def __extract_frames(self, video_file_path: str) -> list:
-
-        # Define the path to the "output_frames" folder
-        folder_path = 'test_data/output_frames'
-
-        # Create the output directory if it doesn't exist
-        os.makedirs(folder_path, exist_ok=True)
-
-        def __frame_difference(prev_frame, curr_frame):
-            # Compute the absolute difference between the current frame and the previous frame
-            diff = cv2.absdiff(prev_frame, curr_frame)
-            # Thresholding to get the binary image, where white represents significant difference
-            _, thresh = cv2.threshold(diff, self.threshold, 255, cv2.THRESH_BINARY)
-            # If there are any white pixels in thresh, the difference is significant
-            return np.any(thresh)
-        
-        # Initialize the video capture
-        capture = cv2.VideoCapture(video_file_path)
-        fps = capture.get(cv2.CAP_PROP_FPS)
-        frame_duration = 1000 / fps
-
         video_models = []
+        def _add_model(start_time, end_time):
+            middle_frame_time = start_time / end_time
+            cap.set(cv2.CAP_PROP_POS_MSEC, middle_frame_time)
 
-        frameNr = 0
-        ret, prev_frame = capture.read()
-        prev_frame_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY) if ret else None
-        prev_start_time = 0
+            # Convert the frame to bytes
+            _, encoded_frame = cv2.imencode('.jpg', frame)
+            notable_frame_bytes = encoded_frame.tobytes()
+
+            cap.set(cv2.CAP_PROP_POS_MSEC, end_time)
+
+            # Create an instance of the ImageCaptionLoader
+            loader = ImageCaptionLoader(images=notable_frame_bytes)
+
+            # Load captions for the images
+            list_docs = loader.load()
+
+            video_model = VideoModel(start_time, end_time, list_docs[len(list_docs) - 1].page_content.replace("[SEP]", "").strip())
+            video_models.append(video_model)
+
+        def _is_notable_frame(frame1, frame2, threshold):
+            # Convert frames to grayscale
+            gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
+            gray2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY)
+
+            # Compute absolute difference between frames
+            frame_diff = cv2.absdiff(gray1, gray2)
+
+            # Apply threshold to identify notable differences
+            _, thresholded_diff = cv2.threshold(frame_diff, 30, 255, cv2.THRESH_BINARY)
+
+            # Count the number of white pixels (indicating differences)
+            num_diff_pixels = np.sum(thresholded_diff)
+
+            return num_diff_pixels > threshold
+
+        # Open the video file
+        cap = cv2.VideoCapture(video_file_path)
+
+        # Read the first frame
+        ret, prev_frame = cap.read()
+
+        # Loop through the video frames
         start_time = 0
+        end_time = 0
 
-        while ret:
-            end_time = prev_start_time
-            prev_start_time = capture.get(cv2.CAP_PROP_POS_MSEC)
-
-            ret, frame = capture.read()
+        while True:
+            print(start_time)
+            # Read the next frame
+            ret, frame = cap.read()
             if not ret:
-                start_time = end_time + frame_duration
-                break
-            
-            start_time = prev_start_time
-            # Convert to grayscale for comparison
-            frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                break  # Break the loop if there are no more frames
 
-            # Compare with the previous frame
-            if frameNr == 0 or __frame_difference(prev_frame_gray, frame_gray):
-                end_time = capture.get(cv2.CAP_PROP_POS_MSEC)
-                cv2.imwrite(f'{folder_path}/frame.jpg', frame)
-                prev_frame_gray = frame_gray
+            # Check if the current frame is notable
+            if _is_notable_frame(prev_frame, frame):
+                end_time = cap.get(cv2.CAP_PROP_POS_MSEC)
+                _add_model(start_time, end_time)
+                start_time = end_time
 
-                # List all .jpg files in the folder
-                image_files = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith(".jpg")]
+            # Update the previous frame
+            prev_frame = frame.copy()
 
-                # Create an instance of the ImageCaptionLoader
-                loader = ImageCaptionLoader(images=image_files)
-
-                # Load captions for the images
-                list_docs = loader.load()
-
-                video_model = VideoModel(start_time, end_time, list_docs[len(list_docs) - 1].page_content.replace("[SEP]", "").strip())
-                video_models.append(video_model)
-
-                frameNr += 1
+            # Increment the frame position by the skip value
+            cap.set(cv2.CAP_PROP_POS_FRAMES, cap.get(cv2.CAP_PROP_POS_FRAMES) + self.frame_skip)
 
         # Release the video capture object
-        capture.release()
-        return video_models
+        cap.release()
 
     # ------------------------------------- Existing code ------------------------------------- #
 
