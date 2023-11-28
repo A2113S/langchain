@@ -1,19 +1,15 @@
 1
-00:00:00,000 --> 00:00:03,066
-[a beach scene with tents and people.]
+00:00:05,210 --> 00:00:09,166
+[A man and a woman, part of a group, sit on beach chairs, relishing the golden sand and gentle tropical breezes along the coast.] The golden sand and gentle tropical breezes make the entire coast a
 
 2
-00:00:05,210 --> 00:00:08,590
-[Group sits on beach, enjoying sand and breeze.] The golden sand and gentle tropical breezes make the entire
+00:00:09,188 --> 00:00:11,450
+[A man and woman, among others, lounge on the beach, a paradise for sun lovers of all ages.] paradise for sun lovers of all ages.
 
 3
-00:00:08,660 --> 00:00:11,450
-[All ages sunbathe at coast.] coast a paradise for sun lovers of all ages.
+00:00:11,450 --> 00:00:15,233
+[a group of people including a man and a woman sitting in chairs on the beach.]
 
 4
-00:00:11,450 --> 00:00:12,000
-[A group of people, including a man and a woman, sitting on chairs at the beach.]
-
-5
-00:00:12,000 --> 00:00:16,866
-[A woman in a bikini, sitting on a beach chair and smoking on the beach.]
+00:00:15,233 --> 00:00:15,633
+[a woman in a bikini on the beach.]
