@@ -3,10 +3,11 @@ from langchain.callbacks.manager import CallbackManagerForChainRun
 from langchain.chains.llm import LLMChain
 from langchain.chains.video_captioning.models import VideoModel
 from langchain.chains.video_captioning.prompts import JOIN_SIMILAR_VIDEO_MODELS_PROMPT, REMOVE_VIDEO_MODEL_DESCRIPTION_PROMPT
+from langchain.chains.video_captioning.services.service import Processor
 from langchain.schema.language_model import BaseLanguageModel
 
 
-class CaptionProcessor:
+class CaptionProcessor(Processor):
     def __init__(self, llm: BaseLanguageModel, verbose = True, similarity_threshold = 80, use_unclustered_models=False):
         self.llm = llm
         self.verbose = verbose
@@ -45,7 +46,7 @@ class CaptionProcessor:
             stripped_description = self.__remove_video_model_description_prefix(combined_description, run_manager)
 
             # Create a new video model which is the combination of all the models in the cluster
-            combined_and_stripped_model = VideoModel(start_vm.start_time(), end_vm.end_time(), stripped_description)
+            combined_and_stripped_model = VideoModel(start_vm.start_time, end_vm.end_time, stripped_description)
 
             video_models_post_clustering.append(combined_and_stripped_model)
 
@@ -62,8 +63,8 @@ class CaptionProcessor:
         for video_model in video_models:
 
             # Join this model and the previous model if they have the same image description
-            if (len(video_models) > 0 and video_models[-1].image_description() == video_model.image_description()):
-                buffer[-1].end_time(video_model.end_time())
+            if (len(video_models) > 0 and video_models[-1].image_description == video_model.image_description):
+                buffer[-1].end_time(video_model.end_time)
 
             else:
                 buffer.append(video_model)
@@ -98,7 +99,7 @@ class CaptionProcessor:
         description = ""
         count = 1
         for video_model in video_models:
-            description += f"Description {count}: " + video_model.image_description() + ", "
+            description += f"Description {count}: " + video_model.image_description + ", "
             count += 1
 
         # Strip trailing ", "
@@ -127,8 +128,7 @@ class CaptionProcessor:
         # Keeps track of the current video model index
         index = 0
         for vm in video_models:
-            image_description = vm.image_description()
-            for word in image_description.split():
+            for word in vm.image_description.split():
                 formatted_word = format_word(word)
                 word_bank[formatted_word] = (word_bank[formatted_word] if formatted_word in word_bank else []) + [index]
             index += 1
@@ -140,8 +140,7 @@ class CaptionProcessor:
         for vm in video_models:
             # Maps other video model index to number of words it shares in common with this video model
             matches: Dict[int, int] = {}
-            image_description = vm.image_description()
-            for word in image_description.split():
+            for word in vm.image_description.split():
                 formatted_word = format_word(word)
                 for match in word_bank[formatted_word]:
                     if match != index:

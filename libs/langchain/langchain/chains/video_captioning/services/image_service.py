@@ -1,22 +1,18 @@
-import os
-
+from typing import Optional
 import cv2
 import numpy as np
-
+from langchain.callbacks.manager import CallbackManagerForChainRun
 from langchain.chains.video_captioning.models import VideoModel
+from langchain.chains.video_captioning.services.service import Processor
 from langchain.document_loaders import ImageCaptionLoader
-import transformers
 
 
-transformers.logging.set_verbosity_error()
-
-
-class ImageProcessor:
+class ImageProcessor(Processor):
     def __init__(self, frame_skip = 3, threshold: int = 3000000):
         self.threshold = threshold
         self.frame_skip = frame_skip
 
-    def process(self, video_file_path: str) -> list:
+    def process(self, video_file_path: str, run_manager: Optional[CallbackManagerForChainRun] = None) -> list:
         return self.__extract_frames(video_file_path)
     
 
@@ -68,14 +64,13 @@ class ImageProcessor:
         end_time = 0
 
         while True:
-            print(start_time)
             # Read the next frame
             ret, frame = cap.read()
             if not ret:
                 break  # Break the loop if there are no more frames
 
             # Check if the current frame is notable
-            if _is_notable_frame(prev_frame, frame):
+            if _is_notable_frame(prev_frame, frame, self.threshold):
                 end_time = cap.get(cv2.CAP_PROP_POS_MSEC)
                 _add_model(start_time, end_time)
                 start_time = end_time
@@ -88,6 +83,8 @@ class ImageProcessor:
 
         # Release the video capture object
         cap.release()
+
+        return video_models
 
     # ------------------------------------- Existing code ------------------------------------- #
 

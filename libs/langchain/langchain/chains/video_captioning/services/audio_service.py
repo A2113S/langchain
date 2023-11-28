@@ -1,12 +1,15 @@
 import subprocess
 from pathlib import Path
+from typing import Optional
+from langchain.callbacks.manager import CallbackManagerForChainRun
 
 from langchain.chains.video_captioning.models import AudioModel
+from langchain.chains.video_captioning.services.service import Processor
 from langchain.document_loaders import AssemblyAIAudioTranscriptLoader
 from langchain.document_loaders.assemblyai import TranscriptFormat
 
 
-class AudioProcessor:
+class AudioProcessor(Processor):
     #TODO: Delete mp3
     def __init__(
         self,
@@ -16,7 +19,7 @@ class AudioProcessor:
         self.output_audio_path = output_audio_path
         self.api_key = api_key
 
-    def process(self, video_file_path: str) -> list:
+    def process(self, video_file_path: str, run_manager: Optional[CallbackManagerForChainRun] = None) -> list:
         audio_file_path = self.__extract_audio(video_file_path)
         return self.__transcribe_audio(audio_file_path)
 
