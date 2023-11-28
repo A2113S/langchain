@@ -50,7 +50,9 @@ class VideoCaptioningChain(Chain):
                 "Missing 'video_file_path' in inputs for video captioning."
             )
         video_file_path = inputs["video_file_path"]
+        nl = '\n'
 
+        run_manager.on_text("Loading processors..."+nl) if self.use_logging and run_manager else None
 
         audio_processor = AudioProcessor(api_key = self.assemblyai_key)
         image_processor = ImageProcessor(frame_skip = self.frame_skip, threshold = self.image_delta_threshold)
@@ -64,28 +66,27 @@ class VideoCaptioningChain(Chain):
             )
         srt_processor = SRTProcessor()
         
-        nl = '\n'
-        run_manager.on_text("Finished loading processors."+nl) if self.use_logging and run_manager else None
+        run_manager.on_text("Finished loading processors."+nl+"Generating subtitles from audio..."+nl) if self.use_logging and run_manager else None
 
         # Get models for speech to text subtitles
         audio_models = audio_processor.process(video_file_path, run_manager)
-        run_manager.on_text("Finished generating subtitles:"+nl+f"{nl.join(str(obj) for obj in audio_models)}"+nl) if self.use_logging and run_manager else None
+        run_manager.on_text("Finished generating subtitles:"+nl+f"{nl.join(str(obj) for obj in audio_models)}"+nl+"Generating closed captions from video..."+nl) if self.use_logging and run_manager else None
 
         # Get models for image frame description
         image_models = image_processor.process(video_file_path, run_manager)
-        run_manager.on_text(f"Finished generating closed captions:"+nl+f"{nl.join(str(obj) for obj in image_models)}"+nl) if self.use_logging and run_manager else None
+        run_manager.on_text(f"Finished generating closed captions:"+nl+f"{nl.join(str(obj) for obj in image_models)}"+nl+"Refining closed captions..."+nl) if self.use_logging and run_manager else None
 
         # Get models for video event closed-captions
         video_models = caption_processor.process(image_models, run_manager)
-        run_manager.on_text(f"Finished refining closed captions:"+nl+f"{nl.join(str(obj) for obj in video_models)}"+nl) if self.use_logging and run_manager else None
+        run_manager.on_text(f"Finished refining closed captions:"+nl+f"{nl.join(str(obj) for obj in video_models)}"+nl+"Combining subtitles with closed captions..."+nl) if self.use_logging and run_manager else None
 
         # Combine the subtitle models with the closed-caption models
         caption_models = combine_processor.process(video_models, audio_models, run_manager)
-        run_manager.on_text(f"Finished combining subtitles with closed captions:"+nl+f"{nl.join(str(obj) for obj in caption_models)}"+nl) if self.use_logging and run_manager else None
+        run_manager.on_text(f"Finished combining subtitles with closed captions:"+nl+f"{nl.join(str(obj) for obj in caption_models)}"+nl+"Generating SRT file..."+nl) if self.use_logging and run_manager else None
 
         # Convert the combined model to SRT format
         srt_content = srt_processor.process(caption_models, run_manager)
-        run_manager.on_text("Finished generating srt file from video file."+nl) if self.use_logging and run_manager else None
+        run_manager.on_text("Finished generating srt file."+nl) if self.use_logging and run_manager else None
             
 
         return {"srt": srt_content}
