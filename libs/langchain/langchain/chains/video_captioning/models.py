@@ -28,6 +28,20 @@ class VideoModel(BaseModel):
         super().__init__(start_time, end_time)
         self._image_description = image_description
 
+    # Instantiate a video model from caption data which represents the description of what is currently happening in the video segment
+    @staticmethod
+    def convert(caption_data:str):
+        line = caption_data.strip().split("\n")
+        if not line.strip():
+            raise ValueError("The 'caption_data' parameter cannot be empty.")
+
+        parts = line.split(",")
+        start_time = float(parts[0].split(":")[1].strip())
+        end_time = float(parts[1].split(":")[1].strip())
+        image_description = parts[2].split(":")[1].strip()
+
+        return VideoModel(start_time, end_time, image_description)
+
     @property
     def image_description(self):
         return self._image_description
@@ -39,7 +53,7 @@ class VideoModel(BaseModel):
     def __str__(self):
         return f"{super().__str__()}, image_description: {self.image_description}"
     
-    def get_similarity_score(self, other):
+    def similarity_score(self, other):
         # Tokenize the image descriptions by extracting individual words, stripping trailing 's' (plural = singular)
         # and converting the words to lowercase in order to be case-insensitive
         self_tokenized = set(word.lower().rstrip('s') for word in self.image_description.split())
@@ -86,3 +100,6 @@ class CaptionModel(BaseModel):
 
     def __str__(self):
         return f"{super().__str__()}, closed_caption: {self.closed_caption}"
+
+    def to_srt_entry(self, index):
+        return f"{index}\n{self._start_time} --> {self._end_time}\n{self._closed_caption}\n"
