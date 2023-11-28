@@ -96,14 +96,14 @@ class CaptionProcessor(Processor):
 
     
     def __join_similar_video_models(self, video_models: List[VideoModel], run_manager: Optional[CallbackManagerForChainRun] = None) -> str:
-        description = ""
+        descriptions = ""
         count = 1
         for video_model in video_models:
-            description += f"Description {count}: " + video_model.image_description + ", "
+            descriptions += f"Description {count}: " + video_model.image_description + ", "
             count += 1
 
         # Strip trailing ", "
-        description = description[:-2]
+        descriptions = descriptions[:-2]
  
         conversation = LLMChain(
             llm=self.llm,
@@ -112,7 +112,7 @@ class CaptionProcessor(Processor):
             callbacks=run_manager.get_child() if run_manager else None
         )
         # Get response from OpenAI using LLMChain
-        response = conversation({"description": description})
+        response = conversation({"descriptions": descriptions})
 
         # Take out the Result: part of the response
         return response["text"].replace("Result:", "").strip()

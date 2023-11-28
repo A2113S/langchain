@@ -1,5 +1,8 @@
-class BaseModel:
-    def __init__(self, start_time, end_time):
+from datetime import datetime
+
+class BaseModel():
+    def __init__(self, start_time: int, end_time: int):
+        # Start and end times representing milliseconds
         self._start_time = start_time
         self._end_time = end_time
 
@@ -21,6 +24,18 @@ class BaseModel:
 
     def __str__(self):
         return f"start_time: {self.start_time}, end_time: {self.end_time}"
+    
+    @classmethod
+    def from_srt(cls, start_time: str, end_time: str, *args):
+        return cls(cls._srt_time_to_ms(start_time), cls._srt_time_to_ms(end_time), *args)
+
+    @staticmethod
+    def _srt_time_to_ms(srt_time_string: str) -> int:
+        # Parse SRT time string into a datetime object
+        time_format = "%H:%M:%S,%f"
+        dt = datetime.strptime(srt_time_string, time_format)
+        ms = dt.microsecond // 1000
+        return dt.second * 1000 + ms
 
 
 class VideoModel(BaseModel):
@@ -100,6 +115,15 @@ class CaptionModel(BaseModel):
 
     def __str__(self):
         return f"{super().__str__()}, closed_caption: {self.closed_caption}"
-
+    
     def to_srt_entry(self, index):
-        return f"{index}\n{self._start_time} --> {self._end_time}\n{self._closed_caption}\n"
+        def _ms_to_srt_time(ms:int) -> str:    
+            """Converts milliseconds to SRT time format 'HH:MM:SS,mmm'."""
+            hours = int(ms // 3600000)
+            minutes = int((ms % 3600000) // 60000)
+            seconds = int((ms % 60000) // 1000)
+            milliseconds = int(ms % 1000)
+
+            return f'{hours:02}:{minutes:02}:{seconds:02},{milliseconds:03}'
+        
+        return "\n".join([f"{index}",f"{_ms_to_srt_time(self._start_time)} --> {_ms_to_srt_time(self._end_time)}", f"{self._closed_caption}", ""])

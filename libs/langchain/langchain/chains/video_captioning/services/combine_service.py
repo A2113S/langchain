@@ -18,45 +18,27 @@ class CombineProcessor(Processor):
 
         # Adjust as needed. Be careful adjusting it too low because OpenAI may produce unwanted output
         self.__CHAR_LIMIT = char_limit
-
-
-    # Helper
-    def __parse_time(s:str) -> int:
-        """Converts a time string into milliseconds."""
-        h, m, s = map(float, s.replace(',', '.').split(':'))
-        return int((h * 3600 + m * 60 + s) * 1000)
-
-    # Helper
-    def __milliseconds_to_srt_time(ms:int,str) -> str:    
-        if isinstance(ms, str) and ',' in ms:        
-            return ms
-
-        """Converts milliseconds to SRT time format 'HH:MM:SS,mmm'."""
-        hours = int(ms // 3600000)
-        minutes = int((ms % 3600000) // 60000)
-        seconds = int((ms % 60000) // 1000)
-        milliseconds = int(ms % 1000)
-
-        return f'{hours:02}:{minutes:02}:{seconds:02},{milliseconds:03}'
     
     
     def process(self, video_models: List[VideoModel], audio_models: List[AudioModel], run_manager: Optional[CallbackManagerForChainRun] = None) -> List[CaptionModel]:
         caption_models = []
-
+        
         for video_model in video_models:
             overlapping_audio_models = self.__find_overlapping_audio_models(video_model, audio_models)
+
+            run_manager.on_text(str(video_model.start_time) + ", " + str(video_model.end_time) + "\n") if run_manager else None
 
             if overlapping_audio_models:
                 # Create separate captions for each overlapping audio model
                 last_end_time = video_model.start_time  # Initialize last_end_time
 
                 for audio_model in overlapping_audio_models:
-                    overlap_start = max(video_model.start_time, CombineProcessor.__parse_time(audio_model.start_time))
-                    overlap_end = min(video_model.end_time, CombineProcessor.__parse_time(audio_model.end_time))
+                    overlap_start = max(video_model.start_time, audio_model.start_time)
+                    overlap_end = min(video_model.end_time, audio_model.end_time)
 
                     # Create a caption for the overlapping period
-                    caption_text = f"[{self.__validate_and_adjust_description(audio_model, video_model)}] {audio_model.subtitle_text}"
-                    caption_model = CaptionModel(CombineProcessor.__milliseconds_to_srt_time(overlap_start), CombineProcessor.__milliseconds_to_srt_time(overlap_end), caption_text)
+                    caption_text = f"[{self.__validate_and_adjust_description(audio_model, video_model, run_manager)}] {audio_model.subtitle_text}"
+                    caption_model = CaptionModel(overlap_start, overlap_end, caption_text)
                     caption_models.append(caption_model)
 
                     last_end_time = overlap_end  # Update last_end_time
@@ -66,13 +48,13 @@ class CombineProcessor(Processor):
                     gap_start = last_end_time
                     gap_end = video_model.end_time
                     gap_caption_text = f"[{video_model.image_description}]"
-                    gap_caption_model = CaptionModel(CombineProcessor.__milliseconds_to_srt_time(gap_start), CombineProcessor.__milliseconds_to_srt_time(gap_end), gap_caption_text)
+                    gap_caption_model = CaptionModel(gap_start, gap_end, gap_caption_text)
                     caption_models.append(gap_caption_model)
 
             else:
                 # No overlapping audio, use video model's description for the entire duration
                 caption_text = f"[{video_model.image_description}]"
-                caption_model = CaptionModel(CombineProcessor.__milliseconds_to_srt_time(video_model.start_time), CombineProcessor.__milliseconds_to_srt_time(video_model.end_time), caption_text)
+                caption_model = CaptionModel(video_model.start_time, video_model.end_time, caption_text)
                 caption_models.append(caption_model)
 
         return caption_models
@@ -83,8 +65,8 @@ class CombineProcessor(Processor):
         video_end = video_model.end_time
 
         for audio_model in audio_models:
-            audio_start = CombineProcessor.__parse_time(str(audio_model.start_time))
-            audio_end = CombineProcessor.__parse_time(str(audio_model.end_time))
+            audio_start = audio_model.start_time
+            audio_end = audio_model.end_time
             overlap_start = max(audio_start, video_start)
             overlap_end = min(audio_end, video_end)
 
@@ -101,7 +83,7 @@ class CombineProcessor(Processor):
             callbacks=run_manager.get_child() if run_manager else None
         )
         # Get response from OpenAI using LLMChain
-        response: Dict[str, str] = conversation({"limit": self.__CHAR_LIMIT, "subtitle": audio_model.subtitle_text})
+        response: Dict[str, str] = conversation({"limit": self.__CHAR_LIMIT, "subtitle": audio_model.subtitle_text, "description": video_model.image_description})
 
         # Take out the Result: part of the response
         return response["text"].replace("Result:", "").strip()

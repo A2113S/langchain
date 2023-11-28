@@ -80,7 +80,7 @@ class VideoCaptioningChain(Chain):
         run_manager.on_text(f"Finished refining closed captions:"+nl+f"{nl.join(str(obj) for obj in video_models)}"+nl) if self.use_logging and run_manager else None
 
         # Combine the subtitle models with the closed-caption models
-        caption_models = combine_processor.process(audio_models, video_models, run_manager)
+        caption_models = combine_processor.process(video_models, audio_models, run_manager)
         run_manager.on_text(f"Finished combining subtitles with closed captions:"+nl+f"{nl.join(str(obj) for obj in caption_models)}"+nl) if self.use_logging and run_manager else None
 
         # Convert the combined model to SRT format
