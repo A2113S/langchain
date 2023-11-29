@@ -8,7 +8,9 @@ from langchain.document_loaders import ImageCaptionLoader
 
 
 class ImageProcessor(Processor):
-    def __init__(self, frame_skip = 3, threshold: int = 3000000):
+    _SAMPLES_PER_SECOND = 4
+
+    def __init__(self, frame_skip = None, threshold: int = 3000000):
         self.threshold = threshold
         self.frame_skip = frame_skip
 
@@ -55,6 +57,10 @@ class ImageProcessor(Processor):
 
         # Open the video file
         cap = cv2.VideoCapture(video_file_path)
+
+        if self.frame_skip is None:
+            self.frame_skip = cap.get(cv2.CAP_PROP_FPS) // self._SAMPLES_PER_SECOND
+            print( self.frame_skip)
 
         # Read the first frame
         ret, prev_frame = cap.read()

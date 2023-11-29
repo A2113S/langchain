@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, Dict, Any
+from typing import List, Optional, Dict, Any
 
 from pydantic import Extra
 
@@ -22,10 +22,10 @@ class VideoCaptioningChain(Chain):
     prompt: Optional[PromptTemplate] = None
     verbose: Optional[bool] = True
     use_logging: Optional[bool] = True
-    frame_skip: Optional[int] = 3
+    frame_skip: Optional[int] = None
     image_delta_threshold: Optional[int] = 3000000
     closed_caption_char_limit: Optional[int] = 20
-    closed_caption_similarity_threshold: Optional[int] = 90
+    closed_caption_similarity_threshold: Optional[int] = 80
     use_unclustered_video_models: Optional[bool] = False
 
     class Config:

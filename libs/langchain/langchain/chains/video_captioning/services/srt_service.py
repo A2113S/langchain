@@ -1,5 +1,5 @@
     
-from typing import Dict, List, Optional
+from typing import List, Optional
 from langchain.callbacks.manager import CallbackManagerForChainRun
 from langchain.chains.video_captioning.models import CaptionModel
 from langchain.chains.video_captioning.services.service import Processor

@@ -8,7 +8,7 @@ from langchain.schema.language_model import BaseLanguageModel
 
 
 class CaptionProcessor(Processor):
-    def __init__(self, llm: BaseLanguageModel, verbose = True, similarity_threshold = 90, use_unclustered_models=False):
+    def __init__(self, llm: BaseLanguageModel, verbose = True, similarity_threshold = 80, use_unclustered_models=False):
         self.llm = llm
         self.verbose = verbose
 
@@ -75,7 +75,7 @@ class CaptionProcessor(Processor):
         video_models = []
         for line in caption_data:
             try:
-                video_models.append(VideoModel.convert(line))
+                video_models.append(VideoModel.from_caption_data(line))
             except ValueError:
                 continue
 

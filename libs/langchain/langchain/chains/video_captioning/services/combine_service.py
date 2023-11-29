@@ -22,30 +22,63 @@ class CombineProcessor(Processor):
     def process(self, video_models: List[VideoModel], audio_models: List[AudioModel], run_manager: Optional[CallbackManagerForChainRun] = None) -> List[CaptionModel]:
         caption_models = []
 
+        # If we have written an audio model to caption_models, we can discard it
+        audio_models_remaining = audio_models.copy()
+
+        # Get the first audio model
+        if audio_models_remaining:
+            audio_model = audio_models_remaining.pop(0)
+
         for video_model in video_models:
-            for audio_model in audio_models:
-                overlap_start, overlap_end = self._check_overlap(video_model, audio_model)
-                if overlap_start:
-                    if video_model.start_time < overlap_start:
-                        caption_models.append(CaptionModel(video_model.start_time, overlap_start, video_model.image_description))
-                    elif audio_model.start_time < overlap_start:
-                        caption_models.append(CaptionModel(audio_model.start_time, overlap_start, audio_model.subtitle_text))
+            overlap_start, overlap_end = self._check_overlap(video_model, audio_model)
 
-                    caption_text = f"[{self._validate_and_adjust_description(audio_model, video_model, run_manager)}] {audio_model.subtitle_text}"
-                    caption_model = CaptionModel(overlap_start, overlap_end, caption_text)
-                    caption_models.append(caption_model)
+            if overlap_start is None:
+                # No overlap
+                # Check if the audio model came before the video model and if it did, add it to captions before the video model
+                if audio_model.start_time <= video_model.start_time:
+                    caption_models.append(CaptionModel.from_audio_model(audio_model))
+                    # Get the next audio model to work with
+                    if audio_models_remaining:
+                        audio_model = audio_models_remaining.pop(0)
+                
+                caption_models.append(CaptionModel.from_video_model(video_model))
+            
+            else:
+                # Overlap detected
+                # Handle the caption for when they are not overlapping, before the overlap
+                if video_model.start_time < overlap_start:
+                    caption_models.append(CaptionModel.from_video_model(VideoModel(video_model.start_time, overlap_start, video_model.image_description)))
+                elif audio_model.start_time < overlap_start:
+                    caption_models.append(CaptionModel(audio_model.start_time, overlap_start, audio_model.subtitle_text))
 
-                    if video_model.end_time > overlap_end:
-                        caption_models.append(CaptionModel(overlap_end, video_model.end_time, video_model.image_description))
-                    elif audio_model.end_time > overlap_end:
-                        caption_models.append(CaptionModel(overlap_end, audio_model.end_time, audio_model.subtitle_text))
+                # Handle the combined caption during overlap
+                caption_text = self._validate_and_adjust_description(audio_model, video_model, run_manager)
+                subtitle_text = audio_model.subtitle_text
+                caption_model = CaptionModel.from_video_model(VideoModel(overlap_start, overlap_end, caption_text)).add_subtitle_text(subtitle_text)
+                caption_models.append(caption_model)
 
+                # Handle the caption for when they are not overlapping, after the overlap
+                if video_model.end_time > overlap_end:
+                    caption_models.append(CaptionModel.from_video_model(VideoModel(overlap_end, video_model.end_time, video_model.image_description)))
+                elif audio_model.end_time > overlap_end:
+                    caption_models.append(CaptionModel(overlap_end, audio_model.end_time, audio_model.subtitle_text))
+
+                # Get the next audio model to work with
+                if audio_models_remaining:
+                    audio_model = audio_models_remaining.pop(0)
+        
+        # Dump all remaining audio models that belong after all video models
+        while audio_models_remaining:
+            caption_models.append(CaptionModel.from_audio_model(audio_model))
+            # Get the next audio model to work with
+            audio_model = audio_models_remaining.pop(0)
+        
         return caption_models
 
     @staticmethod
     def _check_overlap(video_model: VideoModel, audio_model: AudioModel):
         overlap_start = max(audio_model.start_time, video_model.start_time)
-        overlap_end = min(audio_model.start_time, video_model.end_time)
+        overlap_end = min(audio_model.end_time, video_model.end_time)
         if overlap_start < overlap_end:
             return overlap_start, overlap_end
         return None, None

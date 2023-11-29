@@ -43,9 +43,8 @@ class VideoModel(BaseModel):
         super().__init__(start_time, end_time)
         self._image_description = image_description
 
-    # Instantiate a video model from caption data which represents the description of what is currently happening in the video segment
-    @staticmethod
-    def convert(caption_data:str):
+    @classmethod
+    def from_caption_data(cls, caption_data:str):
         line = caption_data.strip().split("\n")
         if not line.strip():
             raise ValueError("The 'caption_data' parameter cannot be empty.")
@@ -55,7 +54,7 @@ class VideoModel(BaseModel):
         end_time = float(parts[1].split(":")[1].strip())
         image_description = parts[2].split(":")[1].strip()
 
-        return VideoModel(start_time, end_time, image_description)
+        return cls(start_time, end_time, image_description)
 
     @property
     def image_description(self):
@@ -113,6 +112,10 @@ class CaptionModel(BaseModel):
     def closed_caption(self, value):
         self._closed_caption = value
 
+    def add_subtitle_text(self, subtitle_text: str):
+        self._closed_caption = self._closed_caption + " " + subtitle_text
+        return self
+
     def __str__(self):
         return f"{super().__str__()}, closed_caption: {self.closed_caption}"
     
@@ -127,3 +130,11 @@ class CaptionModel(BaseModel):
             return f'{hours:02}:{minutes:02}:{seconds:02},{milliseconds:03}'
         
         return "\n".join([f"{index}",f"{_ms_to_srt_time(self._start_time)} --> {_ms_to_srt_time(self._end_time)}", f"{self._closed_caption}", ""])
+    
+    @classmethod
+    def from_audio_model(cls, audio_model: AudioModel):
+        return cls(audio_model.start_time, audio_model.end_time, audio_model.subtitle_text)
+    
+    @classmethod
+    def from_video_model(cls, video_model: VideoModel):
+        return cls(video_model.start_time, video_model.end_time, f"[{video_model.image_description}]")
