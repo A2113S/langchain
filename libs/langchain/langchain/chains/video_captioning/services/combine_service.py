@@ -30,6 +30,9 @@ class CombineProcessor(Processor):
             audio_model = audio_models_remaining.pop(0)
 
         for video_model in video_models:
+            if not audio_models_remaining:
+                break
+
             overlap_start, overlap_end = self._check_overlap(video_model, audio_model)
 
             if overlap_start is None:
@@ -38,8 +41,7 @@ class CombineProcessor(Processor):
                 if audio_model.start_time <= video_model.start_time:
                     caption_models.append(CaptionModel.from_audio_model(audio_model))
                     # Get the next audio model to work with
-                    if audio_models_remaining:
-                        audio_model = audio_models_remaining.pop(0)
+                    audio_model = audio_models_remaining.pop(0)
                 
                 caption_models.append(CaptionModel.from_video_model(video_model))
             
@@ -62,10 +64,9 @@ class CombineProcessor(Processor):
                     caption_models.append(CaptionModel.from_video_model(VideoModel(overlap_end, video_model.end_time, video_model.image_description)))
                 elif audio_model.end_time > overlap_end:
                     caption_models.append(CaptionModel(overlap_end, audio_model.end_time, audio_model.subtitle_text))
-
+                    
                 # Get the next audio model to work with
-                if audio_models_remaining:
-                    audio_model = audio_models_remaining.pop(0)
+                audio_model = audio_models_remaining.pop(0)
         
         # Dump all remaining audio models that belong after all video models
         while audio_models_remaining:
