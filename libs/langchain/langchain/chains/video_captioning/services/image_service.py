@@ -60,7 +60,6 @@ class ImageProcessor(Processor):
 
         if self.frame_skip is None:
             self.frame_skip = cap.get(cv2.CAP_PROP_FPS) // self._SAMPLES_PER_SECOND
-            print( self.frame_skip)
 
         # Read the first frame
         ret, prev_frame = cap.read()
