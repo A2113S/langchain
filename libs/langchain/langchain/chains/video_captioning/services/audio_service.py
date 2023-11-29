@@ -20,8 +20,8 @@ class AudioProcessor(Processor):
 
     def process(self, video_file_path: str, run_manager: Optional[CallbackManagerForChainRun] = None) -> list:
         try:
-            self.__extract_audio(video_file_path)
-            return self.__transcribe_audio()
+            self._extract_audio(video_file_path)
+            return self._transcribe_audio()
         finally:
             # Cleanup: Delete the MP3 file after processing
             try:
@@ -29,7 +29,7 @@ class AudioProcessor(Processor):
             except FileNotFoundError:
                 pass  # File not found, nothing to delete
 
-    def __extract_audio(self, video_file_path: str):
+    def _extract_audio(self, video_file_path: str):
         # Ensure the directory exists where the output file will be saved
         self.output_audio_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -48,7 +48,7 @@ class AudioProcessor(Processor):
             command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
         )
 
-    def __transcribe_audio(self) -> list:
+    def _transcribe_audio(self) -> list:
         if not self.api_key:
             raise ValueError("API key for AssemblyAI is not configured")
         audio_file_path_str = str(self.output_audio_path)
@@ -58,18 +58,18 @@ class AudioProcessor(Processor):
             transcript_format=TranscriptFormat.SUBTITLES_SRT,
         )
         docs = loader.load()
-        return self.__create_transcript_models(docs)
+        return self._create_transcript_models(docs)
 
     @staticmethod
-    def __create_transcript_models(docs):
+    def _create_transcript_models(docs):
         # Assuming docs is a list of Documents with .page_content as the transcript data
         models = []
         for doc in docs:
-            models.extend(AudioProcessor.__parse_transcript(doc.page_content))
+            models.extend(AudioProcessor._parse_transcript(doc.page_content))
         return models
 
     @staticmethod
-    def __parse_transcript(srt_content: str):
+    def _parse_transcript(srt_content: str):
         models = []
         entries = srt_content.strip().split("\n\n")  # Split based on double newline
 

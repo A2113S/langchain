@@ -8,56 +8,56 @@ from langchain.schema.language_model import BaseLanguageModel
 
 
 class CaptionProcessor(Processor):
-    def __init__(self, llm: BaseLanguageModel, verbose = True, similarity_threshold = 80, use_unclustered_models=False):
+    def __init__(self, llm: BaseLanguageModel, verbose = True, similarity_threshold = 90, use_unclustered_models=False):
         self.llm = llm
         self.verbose = verbose
 
         # Set the percentage value for how similar two video model image descriptions should be in order for us to cluster them into a group
-        self.__SIMILARITY_THRESHOLD = similarity_threshold
+        self._SIMILARITY_THRESHOLD = similarity_threshold
         # Set to True if you want to include video models which were not clustered. Will likely result in closed-caption artifacts
-        self.__USE_NON_CLUSTERED_VIDEO_MODELS = use_unclustered_models
+        self._USE_NON_CLUSTERED_VIDEO_MODELS = use_unclustered_models
 
 
     def process(self, video_models: Union[str, List[VideoModel]], run_manager: Optional[CallbackManagerForChainRun] = None) -> List[VideoModel]:
         # If raw caption data provided, convert to video models
         if isinstance(video_models, str):
-            video_models = CaptionProcessor.__convert_to_video_models(video_models)
+            video_models = CaptionProcessor._convert_to_video_models(video_models)
 
         # Remove any consecutive duplicates
-        video_models = CaptionProcessor.__remove_consecutive_duplicates(video_models)
+        video_models = CaptionProcessor._remove_consecutive_duplicates(video_models)
         
         # Holds the video models after clustering has been applied 
         video_models_post_clustering = []
         # In this case, index represents a divider between clusters
         index = 0
-        for start, end in self.__get_model_clusters(video_models):
+        for start, end in self._get_model_clusters(video_models):
             start_vm, end_vm = video_models[start], video_models[end]
 
-            if self.__USE_NON_CLUSTERED_VIDEO_MODELS:
+            if self._USE_NON_CLUSTERED_VIDEO_MODELS:
                 # Append all the non-clustered models in between model clusters staged for OpenAI combination
                 video_models_post_clustering += video_models[index:start]
             index = end + 1
 
             # Send to llm for description combination
             models_to_combine = video_models[start : index]
-            combined_description = self.__join_similar_video_models(models_to_combine, run_manager)
+            combined_description = self._join_similar_video_models(models_to_combine, run_manager)
 
             # Strip any prefixes that are redundant in the context of closed-captions
-            stripped_description = self.__remove_video_model_description_prefix(combined_description, run_manager)
+            stripped_description = self._remove_video_model_description_prefix(combined_description, run_manager)
 
             # Create a new video model which is the combination of all the models in the cluster
             combined_and_stripped_model = VideoModel(start_vm.start_time, end_vm.end_time, stripped_description)
 
             video_models_post_clustering.append(combined_and_stripped_model)
 
-        if self.__USE_NON_CLUSTERED_VIDEO_MODELS:
+        if self._USE_NON_CLUSTERED_VIDEO_MODELS:
             # Append any non-clustered models present after every clustered model
             video_models_post_clustering += video_models[index:]
 
         return video_models_post_clustering
     
 
-    def __remove_consecutive_duplicates(video_models: List[VideoModel]) -> List[VideoModel]:
+    def _remove_consecutive_duplicates(video_models: List[VideoModel]) -> List[VideoModel]:
         buffer: List[VideoModel] = []
 
         for video_model in video_models:
@@ -71,7 +71,7 @@ class CaptionProcessor(Processor):
 
         return buffer
     
-    def __convert_to_video_models(caption_data: str) -> List[VideoModel]:
+    def _convert_to_video_models(caption_data: str) -> List[VideoModel]:
         video_models = []
         for line in caption_data:
             try:
@@ -81,7 +81,7 @@ class CaptionProcessor(Processor):
 
         return video_models
 
-    def __remove_video_model_description_prefix(self, description: str, run_manager: Optional[CallbackManagerForChainRun] = None) -> str:
+    def _remove_video_model_description_prefix(self, description: str, run_manager: Optional[CallbackManagerForChainRun] = None) -> str:
         conversation = LLMChain(
             llm=self.llm,
             prompt=REMOVE_VIDEO_MODEL_DESCRIPTION_PROMPT,
@@ -95,7 +95,7 @@ class CaptionProcessor(Processor):
         return response["text"].replace("Result:", "").strip()
 
     
-    def __join_similar_video_models(self, video_models: List[VideoModel], run_manager: Optional[CallbackManagerForChainRun] = None) -> str:
+    def _join_similar_video_models(self, video_models: List[VideoModel], run_manager: Optional[CallbackManagerForChainRun] = None) -> str:
         descriptions = ""
         count = 1
         for video_model in video_models:
@@ -118,7 +118,7 @@ class CaptionProcessor(Processor):
         return response["text"].replace("Result:", "").strip()
     
 
-    def __get_model_clusters(self, video_models: List[VideoModel]) -> List[Tuple[str, int]]:
+    def _get_model_clusters(self, video_models: List[VideoModel]) -> List[Tuple[str, int]]:
         # Word bank which maps lowercase words (case-insensitive) with trailing s's removed (singular/plural-insensitive) to video model indexes in video_models
         word_bank = {}
 
@@ -166,7 +166,7 @@ class CaptionProcessor(Processor):
                 vms_with_max_score = [key for key, value in sim_scores.items() if value == max_score]
 
                 # Finally, transfer all video models with a high enough similarity to this video model into the sims dictionary
-                if max_score >= self.__SIMILARITY_THRESHOLD:
+                if max_score >= self._SIMILARITY_THRESHOLD:
                     sims[index] = []
                     for vm_index in vms_with_max_score:
                         sims[index].append(vm_index)
@@ -177,7 +177,7 @@ class CaptionProcessor(Processor):
         already_accessed: Dict[int, bool] = {}
 
         # Recursively search video_model[vm_index]'s similarity matches to find the earliest and latest video model in the cluster (start and end)
-        def __find_start_and_end(vm_index):
+        def _find_start_and_end(vm_index):
             close_matches = sims[vm_index]
             first_vm, last_vm = min(close_matches), max(close_matches)
             first_vm, last_vm = min(vm_index, first_vm), max(vm_index, last_vm)
@@ -187,7 +187,7 @@ class CaptionProcessor(Processor):
                 for close_match in close_matches:
                     if close_match in sims:
                         if vm_index in sims[close_match]:
-                            s, e = __find_start_and_end(close_match)
+                            s, e = _find_start_and_end(close_match)
                             first_vm = min(s, first_vm)
                             last_vm = max(e, last_vm)
 
@@ -197,7 +197,7 @@ class CaptionProcessor(Processor):
         # Add the video model cluster results into a set
         clusters = set()
         for vm_index in sims:
-            clusters.add(__find_start_and_end(vm_index))
+            clusters.add(_find_start_and_end(vm_index))
 
         # Filter the set to include only non-subset intervals
         filtered_clusters = set()
@@ -215,17 +215,17 @@ class CaptionProcessor(Processor):
         sorted_clusters = sorted(filtered_clusters, key=lambda x: x[0])
 
         # Merge any overlapping clusters into one big cluster
-        def __merge_overlapping_clusters(array):
+        def _merge_overlapping_clusters(array):
             if len(array) <= 1:
                 return array
             
-            def __merge(curr,rest):
+            def _merge(curr,rest):
                 if curr[1] >= rest[0][0]:
                     return [(curr[0], rest[0][1])] + rest[1:]
                 return [curr] + rest
             
-            return __merge(array[0], __merge_overlapping_clusters(array[1:]))
+            return _merge(array[0], _merge_overlapping_clusters(array[1:]))
 
-        merged_clusters = __merge_overlapping_clusters(sorted_clusters)
+        merged_clusters = _merge_overlapping_clusters(sorted_clusters)
         
         return merged_clusters

@@ -25,7 +25,7 @@ class VideoCaptioningChain(Chain):
     frame_skip: Optional[int] = 3
     image_delta_threshold: Optional[bool] = 3000000
     closed_caption_char_limit: Optional[bool] = 20
-    closed_caption_similarity_threshold: Optional[int] = 80
+    closed_caption_similarity_threshold: Optional[int] = 90
     use_unclustered_video_models: Optional[bool] = False
 
     class Config:
