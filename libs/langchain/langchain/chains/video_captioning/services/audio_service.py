@@ -1,24 +1,28 @@
 import subprocess
 from pathlib import Path
-from typing import Optional
-from langchain.callbacks.manager import CallbackManagerForChainRun
+from typing import List, Optional
 
-from langchain.chains.video_captioning.models import AudioModel
-from langchain.chains.video_captioning.services.service import Processor
+from langchain.callbacks.manager import CallbackManagerForChainRun
+from langchain.chains.video_captioning.models import AudioModel, BaseModel
 from langchain.document_loaders import AssemblyAIAudioTranscriptLoader
 from langchain.document_loaders.assemblyai import TranscriptFormat
+from langchain.schema import Document
 
 
-class AudioProcessor(Processor):
+class AudioProcessor:
     def __init__(
         self,
-        api_key,
-        output_audio_path="output_audio.mp3",
+        api_key: str,
+        output_audio_path: str = "output_audio.mp3",
     ):
         self.output_audio_path = Path(output_audio_path)
         self.api_key = api_key
 
-    def process(self, video_file_path: str, run_manager: Optional[CallbackManagerForChainRun] = None) -> list:
+    def process(
+        self,
+        video_file_path: str,
+        run_manager: Optional[CallbackManagerForChainRun] = None,
+    ) -> list:
         try:
             self._extract_audio(video_file_path)
             return self._transcribe_audio()
@@ -29,7 +33,7 @@ class AudioProcessor(Processor):
             except FileNotFoundError:
                 pass  # File not found, nothing to delete
 
-    def _extract_audio(self, video_file_path: str):
+    def _extract_audio(self, video_file_path: str) -> None:
         # Ensure the directory exists where the output file will be saved
         self.output_audio_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -48,7 +52,7 @@ class AudioProcessor(Processor):
             command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
         )
 
-    def _transcribe_audio(self) -> list:
+    def _transcribe_audio(self) -> List[BaseModel]:
         if not self.api_key:
             raise ValueError("API key for AssemblyAI is not configured")
         audio_file_path_str = str(self.output_audio_path)
@@ -61,7 +65,7 @@ class AudioProcessor(Processor):
         return self._create_transcript_models(docs)
 
     @staticmethod
-    def _create_transcript_models(docs):
+    def _create_transcript_models(docs: List[Document]) -> List[BaseModel]:
         # Assuming docs is a list of Documents with .page_content as the transcript data
         models = []
         for doc in docs:
@@ -69,7 +73,7 @@ class AudioProcessor(Processor):
         return models
 
     @staticmethod
-    def _parse_transcript(srt_content: str):
+    def _parse_transcript(srt_content: str) -> List[BaseModel]:
         models = []
         entries = srt_content.strip().split("\n\n")  # Split based on double newline
 
@@ -83,5 +87,5 @@ class AudioProcessor(Processor):
             start_time, end_time = timespan.split(" --> ")
             subtitle_text = " ".join(subtitle_lines).strip()
             models.append(AudioModel.from_srt(start_time, end_time, subtitle_text))
-            
+
         return models

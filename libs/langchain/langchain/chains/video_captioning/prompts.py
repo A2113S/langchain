@@ -55,7 +55,7 @@ VALIDATE_AND_ADJUST_DESCRIPTION_TEMPLATE = """
 You are tasked with enhancing closed-caption descriptions based on corresponding subtitles from the audio of a real movie clip. 
 Assignment details, from highest to lowest priority:
 
-1) If the subtitle exceeds {limit} characters, creatively rewrite the description to not exceed the character limit, preserving as many details as you can.
+1) If the subtitle exceeds Limit characters, creatively rewrite the description to not exceed the character limit, preserving as many details as you can.
     If you feel that you cannot complete the response under the character limit, you must omit details in order to remain below the character limit.
     
 2) If the details in the subtitle provide meaningful additional information to its closed-caption description, incorporate those details into the description.
@@ -68,7 +68,7 @@ Closed-Caption Description: A car speeds down the street.
 
 Output: Result: A car speeds down the street, its tires screeching and squealing.
 
-**IMPORTANT**: Remember your assignment details when formulating your response! YOU MUST NOT EXCEED {limit} CHARACTERS.
+**IMPORTANT**: Remember your assignment details when formulating your response! YOU MUST NOT EXCEED LIMIT CHARACTERS at human message.
 
 ***IMPORTANT***: You must only return the following text in your response. You may not return a response that does not follow the exact format in the next line:
 Result: Text
@@ -84,7 +84,7 @@ VALIDATE_AND_ADJUST_DESCRIPTION_PROMPT = ChatPromptTemplate(
     messages=[
         SystemMessage(content=VALIDATE_AND_ADJUST_DESCRIPTION_TEMPLATE),
         HumanMessagePromptTemplate.from_template(
-            "Subtitle: {subtitle}\nClosed-Caption Description: {description}"
+            "Limit: {limit}\nSubtitle: {subtitle}\nClosed-Caption Description: {description}"
         ),
     ]
 )
